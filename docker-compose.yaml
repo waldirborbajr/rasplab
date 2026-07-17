@@ -1,0 +1,61 @@
+services:
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - portainer_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - TZ=America/Sao_Paulo
+
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    ports:
+      - "8081:80"          # Acesse em http://seu-ip:8081
+    volumes:
+      - vaultwarden_data:/data
+    environment:
+      - TZ=America/Sao_Paulo
+      - SIGNUPS_ALLOWED=true        # Mude para false depois de criar sua conta
+      - WEBSOCKET_ENABLED=true
+    # mem_limit: 256m             # Descomente se quiser limitar RAM
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "3001:3001"        # Acesse em http://seu-ip:3001
+    volumes:
+      - uptime_kuma_data:/app/data
+    environment:
+      - TZ=America/Sao_Paulo
+
+  adguardhome:
+    image: adguard/adguardhome:latest
+    container_name: adguardhome
+    restart: unless-stopped
+    ports:
+      - "53:53/tcp"        # DNS
+      - "53:53/udp"        # DNS
+      - "3000:3000/tcp"    # Setup inicial (só primeira vez)
+      - "8080:80/tcp"      # Interface web
+    volumes:
+      - adguard_work:/opt/adguardhome/work
+      - adguard_conf:/opt/adguardhome/conf
+    environment:
+      - TZ=America/Sao_Paulo
+
+volumes:
+  portainer_data:
+  vaultwarden_data:
+  uptime_kuma_data:
+  adguard_work:
+  adguard_conf:
+
