@@ -3,7 +3,7 @@
 # Script de Manutenção - Homelab Raspberry Pi 3
 # =============================================
 
-COMPOSE_FILE="docker-compose.yml"
+COMPOSE_FILE="docker-compose.yaml"
 PROJECT_NAME="homelab"
 
 cd "$(dirname "$0")" || exit
