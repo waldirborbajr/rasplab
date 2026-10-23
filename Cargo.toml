@@ -1,0 +1,8 @@
+[package]
+name = "rasplab"
+version = "0.1.0"
+edition = "2024"
+
+
+[dependencies]
+rppal = "0.22"  # confira a versão mais recente em crates.io
