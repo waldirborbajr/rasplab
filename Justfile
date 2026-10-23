@@ -27,28 +27,28 @@ deploy: build
     ssh {{pi}} mkdir -p {{remote}}
     scp {{bin}} {{pi}}:{{remote}}/{{name}}
     scp rasplab.toml {{pi}}:{{remote}}/rasplab.toml
-    scp rasplab.sh  {{pi}}:{{remote}}/rasplab.sh
-    ssh {{pi}} chmod +x {{remote}}/{{name}} {{remote}}/rasplab.sh
+    ssh {{pi}} chmod +x {{remote}}/{{name}}
 
 # Deploy and start the daemon in the background on the Pi
 start: deploy
-    ssh {{pi}} {{remote}}/rasplab.sh start
+    ssh {{pi}} {{remote}}/{{name}} --daemon
+    @echo "daemon started (use 'just status' / 'just logs' to inspect)"
 
 # Stop the daemon on the Pi
 stop:
-    ssh {{pi}} {{remote}}/rasplab.sh stop
+    ssh {{pi}} {{remote}}/{{name}} stop
 
 # Restart the daemon on the Pi
 restart: deploy
-    ssh {{pi}} {{remote}}/rasplab.sh restart
+    ssh {{pi}} {{remote}}/{{name}} restart
 
 # Show daemon status on the Pi
 status:
-    ssh {{pi}} {{remote}}/rasplab.sh status
+    ssh {{pi}} {{remote}}/{{name}} status
 
 # Tail the daemon log on the Pi
 logs:
-    ssh -t {{pi}} {{remote}}/rasplab.sh log
+    ssh -t {{pi}} tail -n 50 -f {{remote}}/rasplab.log
 
 # Run in foreground on the Pi (Ctrl+C to stop)
 run: deploy
