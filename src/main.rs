@@ -1,10 +1,11 @@
 use fork::{daemon, Fork};
 use nix::sys::signal::{kill, Signal};
-use nix::unistd::Pid;
+use nix::unistd::{dup2, Pid};
 use reqwest::blocking::Client;
 use serde::Deserialize;
 use signal_hook::consts::{SIGINT, SIGTERM};
 use std::fs;
+use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::process;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,8 +18,10 @@ use sysinfo::{Components, System};
 const PROJ_NAME: &str = env!("CARGO_PKG_NAME");
 const PROJ_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const PID_FILE: &str = "/home/borba/rasplab/rasplab.pid";
+const BASE_DIR: &str = "/home/borba/rasplab";
 const CONFIG_FILE: &str = "/home/borba/rasplab/rasplab.toml";
+const PID_FILE: &str = "/home/borba/rasplab/rasplab.pid";
+const LOG_FILE: &str = "/home/borba/rasplab/rasplab.log";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -37,14 +40,13 @@ struct TelegramConfig {
 }
 
 fn load_config() -> Config {
-    let content = fs::read_to_string(CONFIG_FILE).unwrap_or_else(|_| {
-        panic!("config file not found: {}", CONFIG_FILE);
-    });
+    let content = fs::read_to_string(CONFIG_FILE)
+        .unwrap_or_else(|_| panic!("config file not found: {}", CONFIG_FILE));
     toml::from_str(&content).expect("failed to parse rasplab.toml")
 }
 
 // ---------------------------------------------------------------------------
-// PID file helpers (used by stop / status / restart / daemon startup)
+// PID file helpers
 // ---------------------------------------------------------------------------
 
 fn read_pid() -> Option<i32> {
@@ -54,7 +56,7 @@ fn read_pid() -> Option<i32> {
 }
 
 fn is_running(pid: i32) -> bool {
-    // Sending signal 0 only checks for existence without actually signalling.
+    // Sending signal 0 only checks existence, it does not signal the process.
     kill(Pid::from_raw(pid), None).is_ok()
 }
 
@@ -165,7 +167,12 @@ fn send_telegram(token: &str, chat_id: &str, text: &str) {
     }
 }
 
-fn periodic_sender(token: String, chat_id: String, interval_minutes: u64, running: Arc<AtomicBool>) {
+fn periodic_sender(
+    token: String,
+    chat_id: String,
+    interval_minutes: u64,
+    running: Arc<AtomicBool>,
+) {
     let interval = Duration::from_secs(interval_minutes.max(1) * 60);
     loop {
         if !running.load(Ordering::Relaxed) {
@@ -173,7 +180,7 @@ fn periodic_sender(token: String, chat_id: String, interval_minutes: u64, runnin
         }
         send_telegram(&token, &chat_id, &build_telemetry());
 
-        // Sleep in small slices so shutdown is responsive.
+        // Sleep in small slices so shutdown stays responsive.
         let mut slept = Duration::ZERO;
         let slice = Duration::from_secs(1);
         while slept < interval {
@@ -268,9 +275,38 @@ fn daemonize() {
 
     match daemon(false, false) {
         Ok(Fork::Child) => {
-            // We are now the daemon. Record our own PID.
+            // Redirect stdout/stderr to the log file BEFORE any println!,
+            // otherwise the output would go to /dev/null (set by daemon()).
+            if let Some(parent) = Path::new(LOG_FILE).parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            match fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(LOG_FILE)
+            {
+                Ok(f) => {
+                    let fd = f.as_raw_fd();
+                    let _ = dup2(fd, 1);
+                    let _ = dup2(fd, 2);
+                    // Keep the file open for the lifetime of the process.
+                    std::mem::forget(f);
+                }
+                Err(e) => {
+                    // Logging is best-effort; continue without it.
+                    eprintln!("warning: cannot open log file {}: {}", LOG_FILE, e);
+                }
+            }
+
             write_pid(process::id());
+            println!(
+                "--- {} v{} starting (pid {}) ---",
+                PROJ_NAME,
+                PROJ_VERSION,
+                process::id()
+            );
             run_app();
+            println!("--- {} v{} stopped ---", PROJ_NAME, PROJ_VERSION);
             remove_pid();
         }
         Ok(Fork::Parent(_)) => {
@@ -292,6 +328,11 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let cmd = args.get(1).map(|s| s.as_str()).unwrap_or("");
 
+    // Ensure the base directory exists for daemon mode.
+    if cmd == "--daemon" || cmd == "restart" {
+        let _ = fs::create_dir_all(BASE_DIR);
+    }
+
     match cmd {
         "--daemon" => daemonize(),
         "stop" => stop_process(),
@@ -303,7 +344,10 @@ fn main() {
         }
         _ => {
             // Foreground mode: Ctrl+C to exit.
-            println!("{} v{} — foreground mode (Ctrl+C to stop)", PROJ_NAME, PROJ_VERSION);
+            println!(
+                "{} v{} — foreground mode (Ctrl+C to stop)",
+                PROJ_NAME, PROJ_VERSION
+            );
             run_app();
         }
     }
