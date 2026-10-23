@@ -13,7 +13,7 @@ Project name and version are read from `Cargo.toml` at compile time and exposed 
 - Periodic telemetry sent to Telegram (interval configurable in minutes).
 - Long-polling Telegram bot listening for commands.
 - `/rasplab` command returns the project name and version.
-- Real daemon mode (`--daemon`) with double-fork + `setsid`, so the process is detached from the terminal and survives SSH logout.
+- Real daemon mode (`daemon`) with double-fork + `setsid`, so the process is detached from the terminal and survives SSH logout.
 - `stop`, `status`, `restart` handled by the binary itself — no shell script required.
 - Daemon log written to `rasplab.log` inside the deployment directory.
 - Graceful shutdown on `SIGINT` / `SIGTERM`.
@@ -102,16 +102,16 @@ Run the binary with one of the following arguments.
 | Command | Description |
 |---------|-------------|
 | *(no argument)* | Run in the foreground. Use `Ctrl+C` to stop. Useful for testing and debugging. |
-| `--daemon` | Detach and run in the background. Returns immediately, survives terminal close and SSH logout. Refuses to start if another instance is already running. |
+| `daemon` | Detach and run in the background. Returns immediately, survives terminal close and SSH logout. Refuses to start if another instance is already running. |
 | `status` | Print `running (pid N)` or `not running`. |
 | `stop` | Send `SIGTERM` to the daemon, wait up to 5 s for a graceful exit, then `SIGKILL` if still alive. Cleans up the pid file. |
-| `restart` | Equivalent to `stop` followed by `--daemon`, with a short pause in between. |
+| `restart` | Equivalent to `stop` followed by `daemon`, with a short pause in between. |
 
 ### Typical workflow
 
 ```bash
 # Start the agent in the background
-./rasplab --daemon
+./rasplab daemon
 
 # Check it is alive
 ./rasplab status
@@ -187,7 +187,7 @@ All remote commands assume SSH access to `borba@192.168.1.15` and a deployment d
 
 ## Interaction with SSH
 
-Because `--daemon` calls `daemon(false, false)` from the `fork` crate, the process:
+Because `daemon` calls `daemon(false, false)` from the `fork` crate, the process:
 
 1. Forks once and the parent exits, returning control to the shell.
 2. Calls `setsid()` in the child, detaching from the controlling terminal.
@@ -196,7 +196,7 @@ Because `--daemon` calls `daemon(false, false)` from the `fork` crate, the proce
 
 As a result, disconnecting the SSH session does **not** kill the daemon — no `SIGHUP` is delivered because the process is no longer attached to the session.
 
-If you start it in **foreground** mode over SSH and disconnect, it will die with the session. Use `--daemon` for anything long-running.
+If you start it in **foreground** mode over SSH and disconnect, it will die with the session. Use `daemon` for anything long-running.
 
 ---
 
