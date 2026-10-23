@@ -1,5 +1,4 @@
 [telegram]
-bot_token = "SEU_TOKEN_AQUI"
-chat_id = "SEU_CHAT_ID_AQUI"
-# Intervalo de envio da telemetria em minutos (ex: 30)
-intervalo_minutos = 30
+bot_token = "YOUR_TOKEN_HERE"
+chat_id = "YOUR_CHAT_ID_HERE"
+interval_minutes = 30
