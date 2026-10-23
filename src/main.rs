@@ -329,12 +329,12 @@ fn main() {
     let cmd = args.get(1).map(|s| s.as_str()).unwrap_or("");
 
     // Ensure the base directory exists for daemon mode.
-    if cmd == "--daemon" || cmd == "restart" {
+    if cmd == "daemon" || cmd == "restart" {
         let _ = fs::create_dir_all(BASE_DIR);
     }
 
     match cmd {
-        "--daemon" => daemonize(),
+        "daemon" => daemonize(),
         "stop" => stop_process(),
         "status" => status_process(),
         "restart" => {
