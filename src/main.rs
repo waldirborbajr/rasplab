@@ -5,160 +5,135 @@ use std::thread;
 use std::time::Duration;
 use sysinfo::{Components, System};
 
-// --- Estruturas de Configuração ---
+const PROJ_NAME: &str = env!("CARGO_PKG_NAME");
+const PROJ_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(Deserialize)]
 struct Config {
     telegram: TelegramConfig,
-    projeto: ProjetoConfig,
 }
 
 #[derive(Deserialize)]
 struct TelegramConfig {
     bot_token: String,
     chat_id: String,
-    intervalo_minutos: u64,
+    interval_minutes: u64,
 }
 
-#[derive(Deserialize)]
-struct ProjetoConfig {
-    nome: String,
-    versao: String,
+fn load_config() -> Config {
+    let content = fs::read_to_string("rasplab.toml")
+        .expect("rasplab.toml not found in the current directory");
+    toml::from_str(&content).expect("failed to parse rasplab.toml")
 }
 
-// --- Funções Auxiliares ---
-fn carregar_config() -> Config {
-    let conteudo = fs::read_to_string("rasplab.toml")
-        .expect("Arquivo rasplab.toml não encontrado no diretório atual.");
-    toml::from_str(&conteudo).expect("Falha ao parsear rasplab.toml")
-}
-
-fn obter_telemetria() -> String {
+fn build_telemetry() -> String {
     let mut sys = System::new_all();
     sys.refresh_all();
 
-    // Temperatura da CPU (Raspberry Pi)
     let components = Components::new_with_refreshed_list();
     let temp = components
         .iter()
         .find(|c| c.label().contains("CPU") || c.label().contains("Core"))
-        .map(|c| format!("{:.1}°C", c.temperature().unwrap_or(0.0)))
+        .and_then(|c| c.temperature())
+        .map(|t| format!("{:.1} °C", t))
         .unwrap_or_else(|| "N/A".to_string());
 
-    // Memória RAM
     let total_mem = sys.total_memory() / 1024 / 1024;
     let used_mem = sys.used_memory() / 1024 / 1024;
 
-    // Uptime
-    let uptime_secs = System::uptime();
-    let dias = uptime_secs / 86400;
-    let horas = (uptime_secs % 86400) / 3600;
-    let minutos = (uptime_secs % 3600) / 60;
+    let up = System::uptime();
+    let days = up / 86400;
+    let hours = (up % 86400) / 3600;
+    let minutes = (up % 3600) / 60;
 
     format!(
-        "📊 *Telemetria RaspLab*\n\
-         🌡️ Temperatura: {}\n\
-         🧠 RAM: {} MB / {} MB\n\
-         ⏱️ Uptime: {}d {}h {}m",
-        temp, used_mem, total_mem, dias, horas, minutos
+        "📊 *{name} v{ver} — telemetry*\n\
+         🌡️ CPU temp: {temp}\n\
+         🧠 RAM: {used} MB / {total} MB\n\
+         ⏱️ Uptime: {d}d {h}h {m}m",
+        name = PROJ_NAME,
+        ver = PROJ_VERSION,
+        temp = temp,
+        used = used_mem,
+        total = total_mem,
+        d = days,
+        h = hours,
+        m = minutes,
     )
 }
 
-fn enviar_telegram(token: &str, chat_id: &str, texto: &str) {
+fn send_telegram(token: &str, chat_id: &str, text: &str) {
     let client = Client::new();
     let url = format!("https://api.telegram.org/bot{}/sendMessage", token);
     let params = [
         ("chat_id", chat_id),
-        ("text", texto),
+        ("text", text),
         ("parse_mode", "Markdown"),
     ];
-
     match client.post(&url).form(&params).send() {
-        Ok(resp) => {
-            if !resp.status().is_success() {
-                eprintln!("Erro ao enviar mensagem: {:?}", resp.text());
-            }
+        Ok(resp) if !resp.status().is_success() => {
+            eprintln!("telegram error: {:?}", resp.text());
         }
-        Err(e) => eprintln!("Erro de rede ao enviar Telegram: {}", e),
+        Ok(_) => {}
+        Err(e) => eprintln!("telegram network error: {}", e),
     }
 }
 
-fn enviar_telemetria_periodica(config: &Config) {
-    let texto = obter_telemetria();
-    enviar_telegram(&config.telegram.bot_token, &config.telegram.chat_id, &texto);
+fn periodic_sender(token: String, chat_id: String, interval_minutes: u64) {
+    let interval = Duration::from_secs(interval_minutes.max(1) * 60);
+    loop {
+        send_telegram(&token, &chat_id, &build_telemetry());
+        thread::sleep(interval);
+    }
 }
 
-// --- Loop de Comandos (Long Polling Simples) ---
-fn loop_comandos(config: Config) {
+fn command_loop(token: String, chat_id: String) {
     let client = Client::new();
     let mut offset: i64 = 0;
-    let url_base = format!("https://api.telegram.org/bot{}", config.telegram.bot_token);
+    let base = format!("https://api.telegram.org/bot{}", token);
 
-    println!("Bot iniciado. Aguardando comandos...");
+    println!("{} v{} — bot listening", PROJ_NAME, PROJ_VERSION);
 
     loop {
-        let url = format!("{}/getUpdates?offset={}&timeout=30", url_base, offset);
+        let url = format!("{}/getUpdates?offset={}&timeout=30", base, offset);
         match client.get(&url).send() {
             Ok(resp) => {
                 if let Ok(json) = resp.json::<serde_json::Value>() {
-                    if let Some(resultados) = json["result"].as_array() {
-                        for update in resultados {
-                            // Atualiza offset para não reprocessar
-                            if let Some(update_id) = update["update_id"].as_i64() {
-                                offset = update_id + 1;
+                    if let Some(results) = json["result"].as_array() {
+                        for update in results {
+                            if let Some(id) = update["update_id"].as_i64() {
+                                offset = id + 1;
                             }
-
-                            // Verifica se é uma mensagem de texto
-                            if let Some(msg) = update.get("message") {
-                                if let Some(texto) = msg["text"].as_str() {
-                                    // Verifica se é o comando /rasplab
-                                    if texto.starts_with("/rasplab") {
-                                        let resposta = format!(
-                                            "🤖 *{}* v{}\nStatus: Online no Raspberry Pi 3",
-                                            config.projeto.nome, config.projeto.versao
-                                        );
-                                        enviar_telegram(
-                                            &config.telegram.bot_token,
-                                            &config.telegram.chat_id,
-                                            &resposta,
-                                        );
-                                    }
-                                }
+                            let text = update
+                                .get("message")
+                                .and_then(|m| m["text"].as_str())
+                                .unwrap_or("");
+                            if text.starts_with("/rasplab") {
+                                let reply = format!(
+                                    "🤖 *{}* v{}\nStatus: online on Raspberry Pi 3",
+                                    PROJ_NAME, PROJ_VERSION
+                                );
+                                send_telegram(&token, &chat_id, &reply);
                             }
                         }
                     }
                 }
             }
-            Err(e) => eprintln!("Erro no polling: {}", e),
+            Err(e) => eprintln!("polling error: {}", e),
         }
-        // Pequena pausa para evitar loop muito rápido em caso de erro
         thread::sleep(Duration::from_secs(1));
     }
 }
 
 fn main() {
-    let config = carregar_config();
+    let cfg = load_config();
+    let token = cfg.telegram.bot_token.clone();
+    let chat_id = cfg.telegram.chat_id.clone();
+    let interval = cfg.telegram.interval_minutes;
 
-    // 1. Inicia thread para envio periódico de telemetria
-    let config_telemetria = Config {
-        telegram: TelegramConfig {
-            bot_token: config.telegram.bot_token.clone(),
-            chat_id: config.telegram.chat_id.clone(),
-            intervalo_minutos: config.telegram.intervalo_minutos,
-        },
-        projeto: ProjetoConfig {
-            nome: config.projeto.nome.clone(),
-            versao: config.projeto.versao.clone(),
-        },
-    };
+    let t = token.clone();
+    let c = chat_id.clone();
+    thread::spawn(move || periodic_sender(t, c, interval));
 
-    thread::spawn(move || {
-        let intervalo = Duration::from_secs(config_telemetria.telegram.intervalo_minutos * 60);
-        loop {
-            enviar_telemetria_periodica(&config_telemetria);
-            thread::sleep(intervalo);
-        }
-    });
-
-    // 2. Loop principal para comandos do Telegram (bloqueante)
-    loop_comandos(config);
+    command_loop(token, chat_id);
 }
