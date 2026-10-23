@@ -3,6 +3,13 @@ name = "rasplab"
 version = "0.1.0"
 edition = "2024"
 
-
 [dependencies]
-rppal = "0.22"  # confira a versão mais recente em crates.io
+# Para ler temperatura e outras infos do sistema
+sysinfo = "0.33"
+# Cliente HTTP para enviar mensagens ao Telegram
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+# Serialização/Desserialização para o arquivo TOML e JSON
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+# Para o loop de long polling do Telegram
+tokio = { version = "1", features = ["full"] }
