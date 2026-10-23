@@ -10,6 +10,7 @@ sysinfo = "0.33"
 reqwest = { version = "0.12", features = ["blocking", "json"] }
 # Serialização/Desserialização para o arquivo TOML e JSON
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 toml = "0.8"
 # Para o loop de long polling do Telegram
 tokio = { version = "1", features = ["full"] }
