@@ -45,7 +45,7 @@ rasplab/
     └── main.rs
 ```
 
-Paths (`BASE_DIR`, `CONFIG_FILE`, `PID_FILE`, `LOG_FILE`) are constants at the top of `main.rs` — adjust them there if you need a different layout.
+The config, PID, and log files are stored in the same directory as the running binary, so the binary can be installed in any location without editing source paths.
 
 ---
 

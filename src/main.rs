@@ -6,7 +6,7 @@ use serde::Deserialize;
 use signal_hook::consts::{SIGINT, SIGTERM};
 use std::fs;
 use std::os::unix::io::AsRawFd;
-use std::path::Path;
+use std::path::PathBuf;
 use std::process;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -18,10 +18,28 @@ use sysinfo::{Components, System};
 const PROJ_NAME: &str = env!("CARGO_PKG_NAME");
 const PROJ_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const BASE_DIR: &str = "/home/borba/rasplab";
-const CONFIG_FILE: &str = "/home/borba/rasplab/rasplab.toml";
-const PID_FILE: &str = "/home/borba/rasplab/rasplab.pid";
-const LOG_FILE: &str = "/home/borba/rasplab/rasplab.log";
+struct AppPaths {
+    base_dir: PathBuf,
+    config_file: PathBuf,
+    pid_file: PathBuf,
+    log_file: PathBuf,
+}
+
+impl AppPaths {
+    fn from_executable() -> Self {
+        let executable = std::env::current_exe().expect("failed to locate executable");
+        let base_dir = executable
+            .parent()
+            .expect("executable has no parent directory")
+            .to_path_buf();
+        Self {
+            config_file: base_dir.join("rasplab.toml"),
+            pid_file: base_dir.join("rasplab.pid"),
+            log_file: base_dir.join("rasplab.log"),
+            base_dir,
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -39,9 +57,9 @@ struct TelegramConfig {
     interval_minutes: u64,
 }
 
-fn load_config() -> Config {
-    let content = fs::read_to_string(CONFIG_FILE)
-        .unwrap_or_else(|_| panic!("config file not found: {}", CONFIG_FILE));
+fn load_config(paths: &AppPaths) -> Config {
+    let content = fs::read_to_string(&paths.config_file)
+        .unwrap_or_else(|_| panic!("config file not found: {}", paths.config_file.display()));
     toml::from_str(&content).expect("failed to parse rasplab.toml")
 }
 
@@ -49,8 +67,8 @@ fn load_config() -> Config {
 // PID file helpers
 // ---------------------------------------------------------------------------
 
-fn read_pid() -> Option<i32> {
-    fs::read_to_string(PID_FILE)
+fn read_pid(paths: &AppPaths) -> Option<i32> {
+    fs::read_to_string(&paths.pid_file)
         .ok()
         .and_then(|s| s.trim().parse::<i32>().ok())
 }
@@ -60,23 +78,23 @@ fn is_running(pid: i32) -> bool {
     kill(Pid::from_raw(pid), None).is_ok()
 }
 
-fn write_pid(pid: u32) {
-    if let Some(parent) = Path::new(PID_FILE).parent() {
+fn write_pid(paths: &AppPaths, pid: u32) {
+    if let Some(parent) = paths.pid_file.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    fs::write(PID_FILE, pid.to_string()).expect("failed to write pid file");
+    fs::write(&paths.pid_file, pid.to_string()).expect("failed to write pid file");
 }
 
-fn remove_pid() {
-    let _ = fs::remove_file(PID_FILE);
+fn remove_pid(paths: &AppPaths) {
+    let _ = fs::remove_file(&paths.pid_file);
 }
 
 // ---------------------------------------------------------------------------
 // stop / status commands
 // ---------------------------------------------------------------------------
 
-fn stop_process() {
-    match read_pid() {
+fn stop_process(paths: &AppPaths) {
+    match read_pid(paths) {
         Some(pid) if is_running(pid) => {
             let _ = kill(Pid::from_raw(pid), Signal::SIGTERM);
             // Give it up to 5 seconds to exit gracefully.
@@ -89,18 +107,18 @@ fn stop_process() {
             if is_running(pid) {
                 let _ = kill(Pid::from_raw(pid), Signal::SIGKILL);
             }
-            remove_pid();
+            remove_pid(paths);
             println!("stopped (pid {})", pid);
         }
         _ => {
-            remove_pid();
+            remove_pid(paths);
             println!("not running");
         }
     }
 }
 
-fn status_process() {
-    match read_pid() {
+fn status_process(paths: &AppPaths) {
+    match read_pid(paths) {
         Some(pid) if is_running(pid) => println!("running (pid {})", pid),
         _ => println!("not running"),
     }
@@ -236,8 +254,8 @@ fn command_loop(token: String, chat_id: String, running: Arc<AtomicBool>) {
 // Application entry (shared by foreground and daemon mode)
 // ---------------------------------------------------------------------------
 
-fn run_app() {
-    let cfg = load_config();
+fn run_app(paths: &AppPaths) {
+    let cfg = load_config(paths);
 
     let running = Arc::new(AtomicBool::new(true));
     for sig in [SIGINT, SIGTERM] {
@@ -262,28 +280,28 @@ fn run_app() {
 // Daemonization
 // ---------------------------------------------------------------------------
 
-fn daemonize() {
+fn daemonize(paths: &AppPaths) {
     // Refuse to start a second instance.
-    if let Some(pid) = read_pid() {
+    if let Some(pid) = read_pid(paths) {
         if is_running(pid) {
             eprintln!("already running (pid {})", pid);
             process::exit(1);
         }
         // Stale pid file: clean it up.
-        remove_pid();
+        remove_pid(paths);
     }
 
     match daemon(false, false) {
         Ok(Fork::Child) => {
             // Redirect stdout/stderr to the log file BEFORE any println!,
             // otherwise the output would go to /dev/null (set by daemon()).
-            if let Some(parent) = Path::new(LOG_FILE).parent() {
+            if let Some(parent) = paths.log_file.parent() {
                 let _ = fs::create_dir_all(parent);
             }
             match fs::OpenOptions::new()
                 .create(true)
                 .append(true)
-                .open(LOG_FILE)
+                .open(&paths.log_file)
             {
                 Ok(f) => {
                     let fd = f.as_raw_fd();
@@ -294,20 +312,20 @@ fn daemonize() {
                 }
                 Err(e) => {
                     // Logging is best-effort; continue without it.
-                    eprintln!("warning: cannot open log file {}: {}", LOG_FILE, e);
+                    eprintln!("warning: cannot open log file {}: {}", paths.log_file.display(), e);
                 }
             }
 
-            write_pid(process::id());
+            write_pid(paths, process::id());
             println!(
                 "--- {} v{} starting (pid {}) ---",
                 PROJ_NAME,
                 PROJ_VERSION,
                 process::id()
             );
-            run_app();
+            run_app(paths);
             println!("--- {} v{} stopped ---", PROJ_NAME, PROJ_VERSION);
-            remove_pid();
+            remove_pid(paths);
         }
         Ok(Fork::Parent(_)) => {
             // Parent exits immediately, releasing the terminal.
@@ -325,22 +343,23 @@ fn daemonize() {
 // ---------------------------------------------------------------------------
 
 fn main() {
+    let paths = AppPaths::from_executable();
     let args: Vec<String> = std::env::args().collect();
     let cmd = args.get(1).map(|s| s.as_str()).unwrap_or("");
 
     // Ensure the base directory exists for daemon mode.
     if cmd == "daemon" || cmd == "restart" {
-        let _ = fs::create_dir_all(BASE_DIR);
+        let _ = fs::create_dir_all(&paths.base_dir);
     }
 
     match cmd {
-        "daemon" => daemonize(),
-        "stop" => stop_process(),
-        "status" => status_process(),
+        "daemon" => daemonize(&paths),
+        "stop" => stop_process(&paths),
+        "status" => status_process(&paths),
         "restart" => {
-            stop_process();
+            stop_process(&paths);
             thread::sleep(Duration::from_millis(500));
-            daemonize();
+            daemonize(&paths);
         }
         _ => {
             // Foreground mode: Ctrl+C to exit.
@@ -348,7 +367,7 @@ fn main() {
                 "{} v{} — foreground mode (Ctrl+C to stop)",
                 PROJ_NAME, PROJ_VERSION
             );
-            run_app();
+            run_app(&paths);
         }
     }
 }
