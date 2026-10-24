@@ -16,7 +16,7 @@ setup:
 
 # Cross-compile for Raspberry Pi 3
 build:
-    OPENSSL_LIB_DIR="$OPENSSL_LIB_DIR_aarch64_unknown_linux_gnu" OPENSSL_INCLUDE_DIR="$OPENSSL_INCLUDE_DIR_aarch64_unknown_linux_gnu" cargo build --release --locked --target {{target}}
+    OPENSSL_LIB_DIR="$OPENSSL_LIB_DIR_aarch64_unknown_linux_gnu" OPENSSL_INCLUDE_DIR="$OPENSSL_INCLUDE_DIR_aarch64_unknown_linux_gnu" cargo build --release --target {{target}}
 
 # Check the Pi architecture (expects aarch64)
 check-pi:
