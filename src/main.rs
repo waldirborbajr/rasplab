@@ -135,8 +135,9 @@ fn build_telemetry() -> String {
     let components = Components::new_with_refreshed_list();
     let temp = components
         .iter()
-        .find(|c| c.label().contains("CPU") || c.label().contains("Core"))
-        .and_then(|c| c.temperature())
+        .filter(|c| is_cpu_temperature_label(c.label()))
+        .find_map(|c| c.temperature())
+        .or_else(read_linux_cpu_temperature)
         .map(|t| format!("{:.1} °C", t))
         .unwrap_or_else(|| "N/A".to_string());
 
@@ -164,12 +165,46 @@ fn build_telemetry() -> String {
     )
 }
 
+fn is_cpu_temperature_label(label: &str) -> bool {
+    let label = label.to_ascii_lowercase();
+    label.contains("cpu") || label.contains("core") || label.contains("soc")
+}
+
+fn read_linux_cpu_temperature() -> Option<f32> {
+    let zones = fs::read_dir("/sys/class/thermal").ok()?;
+    for zone in zones.flatten() {
+        let Ok(zone_type) = fs::read_to_string(zone.path().join("type")) else {
+            continue;
+        };
+        if !is_cpu_temperature_label(zone_type.trim()) {
+            continue;
+        }
+        let Ok(raw_temperature) = fs::read_to_string(zone.path().join("temp")) else {
+            continue;
+        };
+        if let Some(temperature) = parse_linux_temperature(raw_temperature.trim()) {
+            return Some(temperature);
+        }
+    }
+    None
+}
+
+fn parse_linux_temperature(raw_temperature: &str) -> Option<f32> {
+    raw_temperature
+        .parse::<i32>()
+        .ok()
+        .map(|value| value as f32 / 1000.0)
+}
+
 // ---------------------------------------------------------------------------
 // Telegram helpers
 // ---------------------------------------------------------------------------
 
 fn send_telegram(token: &str, chat_id: &str, text: &str) {
-    let client = Client::new();
+    let client = Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .expect("failed to build Telegram HTTP client");
     let url = format!("https://api.telegram.org/bot{}/sendMessage", token);
     let params = [
         ("chat_id", chat_id),
@@ -212,14 +247,16 @@ fn periodic_sender(
 }
 
 fn command_loop(token: String, chat_id: String, running: Arc<AtomicBool>) {
-    let client = Client::new();
+    let client = Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .expect("failed to build Telegram HTTP client");
     let mut offset: i64 = 0;
     let base = format!("https://api.telegram.org/bot{}", token);
 
     println!("{} v{} — bot listening", PROJ_NAME, PROJ_VERSION);
-
     while running.load(Ordering::Relaxed) {
-        let url = format!("{}/getUpdates?offset={}&timeout=30", base, offset);
+        let url = format!("{}/getUpdates?offset={}&timeout=5", base, offset);
         match client.get(&url).send() {
             Ok(resp) => {
                 if let Ok(json) = resp.json::<serde_json::Value>() {
@@ -369,5 +406,24 @@ fn main() {
             );
             run_app(&paths);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_cpu_temperature_label, parse_linux_temperature};
+
+    #[test]
+    fn recognizes_cpu_thermal_zone_labels_case_insensitively() {
+        assert!(is_cpu_temperature_label("cpu-thermal"));
+        assert!(is_cpu_temperature_label("Core 0"));
+        assert!(is_cpu_temperature_label("soc"));
+        assert!(!is_cpu_temperature_label("gpu-thermal"));
+    }
+
+    #[test]
+    fn parses_linux_thermal_zone_millidegrees() {
+        assert_eq!(parse_linux_temperature("52300"), Some(52.3));
+        assert_eq!(parse_linux_temperature("invalid"), None);
     }
 }

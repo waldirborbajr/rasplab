@@ -157,7 +157,7 @@ The first message is sent as soon as the process starts.
 
 Fields available on a Raspberry Pi 3:
 
-- **CPU temperature** — read from `Components`, filtered by label `CPU` / `Core`. Falls back to `N/A` if not exposed by the kernel.
+- **CPU temperature** — read from `Components` when available, then from the Linux thermal zones for CPU/Core/SoC sensors. Falls back to `N/A` if not exposed by the kernel.
 - **RAM** — total and used, in megabytes.
 - **Uptime** — days / hours / minutes since boot.
 
@@ -204,7 +204,7 @@ If you start it in **foreground** mode over SSH and disconnect, it will die with
 
 - `SIGINT` (Ctrl+C in foreground) and `SIGTERM` (sent by `stop`) set an `AtomicBool` flag that the telemetry thread and the command loop both check.
 - The telemetry thread sleeps in 1-second slices, so it stops within roughly one second.
-- The command loop can be blocked up to the long-polling timeout (30 s) inside `getUpdates`. Shorten the `timeout=` parameter in `command_loop` if you need faster shutdown.
+- The command loop uses a 5-second Telegram long-poll and a 10-second HTTP request timeout, so Ctrl+C / SIGTERM shutdown is bounded even while waiting for updates.
 - On clean exit the pid file is removed and a "stopped" marker is written to the log.
 
 ---
