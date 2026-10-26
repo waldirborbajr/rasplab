@@ -129,8 +129,8 @@ fn status_process(paths: &AppPaths) {
 // ---------------------------------------------------------------------------
 
 fn build_telemetry() -> String {
-    let mut sys = System::new_all();
-    sys.refresh_all();
+    let mut sys = System::new();
+    sys.refresh_memory();
 
     let components = Components::new_with_refreshed_list();
     let temp = components
@@ -200,11 +200,7 @@ fn parse_linux_temperature(raw_temperature: &str) -> Option<f32> {
 // Telegram helpers
 // ---------------------------------------------------------------------------
 
-fn send_telegram(token: &str, chat_id: &str, text: &str) {
-    let client = Client::builder()
-        .timeout(Duration::from_secs(10))
-        .build()
-        .expect("failed to build Telegram HTTP client");
+fn send_telegram(client: &Client, token: &str, chat_id: &str, text: &str) {
     let url = format!("https://api.telegram.org/bot{}/sendMessage", token);
     let params = [
         ("chat_id", chat_id),
@@ -226,12 +222,16 @@ fn periodic_sender(
     interval_minutes: u64,
     running: Arc<AtomicBool>,
 ) {
+    let client = Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .expect("failed to build Telegram HTTP client");
     let interval = Duration::from_secs(interval_minutes.max(1) * 60);
     loop {
         if !running.load(Ordering::Relaxed) {
             return;
         }
-        send_telegram(&token, &chat_id, &build_telemetry());
+        send_telegram(&client, &token, &chat_id, &build_telemetry());
 
         // Sleep in small slices so shutdown stays responsive.
         let mut slept = Duration::ZERO;
@@ -274,7 +274,7 @@ fn command_loop(token: String, chat_id: String, running: Arc<AtomicBool>) {
                                     "🤖 *{}* v{}\nStatus: online on Raspberry Pi 3",
                                     PROJ_NAME, PROJ_VERSION
                                 );
-                                send_telegram(&token, &chat_id, &reply);
+                                send_telegram(&client, &token, &chat_id, &reply);
                             }
                         }
                     }

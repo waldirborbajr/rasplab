@@ -21,30 +21,50 @@ Server-rendered web app. No frontend framework, no Node, no frontend build step.
 Do not add dependencies (crates, JS libraries, CSS frameworks) without asking.
 
 ## Commands
+# AGENTS.md
+
+Guidance for coding agents working in this repository.
+
+## Project
+
+Rasplab is a Rust Linux daemon that sends Raspberry Pi telemetry to Telegram.
+The only supported build target is `aarch64-unknown-linux-musl`, tuned for the
+Raspberry Pi 3 Cortex-A53. It requires a 64-bit Linux OS on the Pi.
+
+Do not add dependencies without asking. Keep telemetry collection limited to
+the values the application uses, and reuse HTTP clients so their connection
+pools remain available.
+
+## Build environment
+
+Install the AArch64 Rust target and make `aarch64-linux-musl-gcc` available as
+the cross-linker:
 
 ```sh
-cargo run                              # run the app on http://127.0.0.1:3000
-cargo check                            # fast compile check
-cargo fmt                              # format
-cargo clippy --all-targets -- -D warnings
-cargo test
+rustup target add aarch64-unknown-linux-musl
+cargo build --release
 ```
+
+`.cargo/config.toml` selects the Raspberry Pi target by default. Do not add
+other platform targets or generic host-build instructions.
 
 ## Conventions
 
-### Rust
+- Keep the daemon Linux/Unix-specific; do not introduce cross-platform
+  abstractions for unsupported systems.
+- Keep pure parsing and validation logic in functions with focused unit tests.
+- Preserve graceful `SIGINT`/`SIGTERM` shutdown and the existing command-line
+  interface.
+- `rasplab.toml` contains a Telegram bot token. Never log or commit real
+  credentials.
 
-- Handlers return `Result<_, AppError>`. Unexpected errors become a logged 500.
-- Validation errors re-render the page with a message and a 400 (see
-  `error_page`). Always validate on the server; browser checks are optional UX.
-- Forms use Post/Redirect/Get: a successful `POST` answers with a redirect.
-- **GET routes must not have side effects.** `templates/base.html` prerenders
-  same-origin links (Speculation Rules), so the browser may request a GET
-  route before the user clicks. Anything that writes data uses `POST`.
-- Put pure logic (validation, parsing) in plain functions and unit test them in
-  the `tests` module.
+## Verification
 
+Run these checks in an environment with the configured Raspberry Pi target
+and linker available:
 
-
-Before finishing any task, run `cargo fmt`, `cargo clippy --all-targets -- -D warnings`
-and `cargo test`. All three must pass (CI runs the same commands).
+```sh
+cargo fmt
+cargo clippy --all-targets -- -D warnings
+cargo test
+```

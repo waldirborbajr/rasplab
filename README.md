@@ -38,8 +38,9 @@ In the repository:
 ```
 rasplab/
 ├── Cargo.toml
+├── .cargo/
+│   └── config.toml
 ├── rasplab.toml
-├── Justfile
 ├── README.md
 └── src/
     └── main.rs
@@ -70,28 +71,27 @@ The bot replies only to messages whose command starts with `/rasplab`. Other cha
 
 ## Building
 
-Add the target once:
+The project builds exclusively for the 64-bit Raspberry Pi 3 target
+`aarch64-unknown-linux-musl`. The Pi 3's CPU supports AArch64, but the device
+must be running a 64-bit Linux OS. The static musl target avoids requiring a
+matching system libc on the Pi.
+
+Install the Rust target once and ensure `aarch64-linux-musl-gcc` is available
+as the cross-linker:
 
 ```bash
-just setup
+rustup target add aarch64-unknown-linux-musl
 ```
 
-Cross-compile for the Pi 3:
-
-```bash
-just build
-```
-
-Or build directly on the Pi:
+Build the optimized binary:
 
 ```bash
 cargo build --release
 ```
 
-Binary location:
-
-- Cross-compiled: `target/aarch64-unknown-linux-gnu/release/rasplab`
-- Native: `target/release/rasplab`
+The output is `target/aarch64-unknown-linux-musl/release/rasplab`. Release
+builds use LTO, one codegen unit, stripping, and Cortex-A53 CPU tuning. Cargo is
+configured with this target by default; other build targets are unsupported.
 
 ---
 
@@ -162,26 +162,6 @@ Fields available on a Raspberry Pi 3:
 - **Uptime** — days / hours / minutes since boot.
 
 ---
-
-## Justfile commands
-
-All remote commands assume SSH access to `borba@192.168.1.15` and a deployment directory at `/home/borba/rasplab`. Adjust the `pi` and `remote` variables in the `Justfile` if needed.
-
-| Command | Description |
-|---------|-------------|
-| `just` | List available commands. |
-| `just setup` | Add the `aarch64-unknown-linux-gnu` target to rustup. Run once. |
-| `just build` | Cross-compile for the Pi 3. |
-| `just check-pi` | Verify SSH access and print the Pi's architecture. |
-| `just deploy` | Build and copy the binary and config to the Pi. |
-| `just start` | Deploy and start the daemon in the background. |
-| `just stop` | Stop the daemon on the Pi. |
-| `just restart` | Deploy and restart the daemon. |
-| `just status` | Show daemon status on the Pi. |
-| `just logs` | Tail the daemon log on the Pi. |
-| `just run` | Deploy and run in the foreground (Ctrl+C to stop). |
-| `just clean` | Remove local build artifacts. |
-| `just menu` | Interactive menu wrapping the commands above. |
 
 ---
 
