@@ -1,28 +1,5 @@
 # AGENTS.md
 
-Guidance for AI coding agents working in this repository.
-
-## Stack
-
-Server-rendered web app. No frontend framework, no Node, no frontend build step.
-
-| Layer | Choice |
-|---|---|
-| Runtime | `tokio` |
-| HTTP | `axum` (routes, extractors, responses) |
-| (De)serialization | `serde` (forms, query strings) |
-| Database | `sqlx` with PostgreSQL, plain SQL, migrations in `migrations/` |
-| HTML | `askama` templates in `templates/`, checked at compile time |
-| Static files and request logs | `tower-http` (`ServeDir`, `TraceLayer`) |
-| Logging | `tracing` + `tracing-subscriber` |
-| CSS | Modern vanilla CSS: tokens, `@layer`, nesting, `@scope` |
-| JS | Vanilla JS, only where needed, in `static/app.js` |
-
-Do not add dependencies (crates, JS libraries, CSS frameworks) without asking.
-
-## Commands
-# AGENTS.md
-
 Guidance for coding agents working in this repository.
 
 ## Project
@@ -57,6 +34,7 @@ other platform targets or generic host-build instructions.
   interface.
 - `rasplab.toml` contains a Telegram bot token. Never log or commit real
   credentials.
+- Keep implementation organized into focused module directories under `src/`.
 
 ## Verification
 

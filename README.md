@@ -17,7 +17,7 @@ Project name and version are read from `Cargo.toml` at compile time and exposed 
 - `stop`, `status`, `restart` handled by the binary itself — no shell script required.
 - Daemon log written to `rasplab.log` inside the deployment directory.
 - Graceful shutdown on `SIGINT` / `SIGTERM`.
-- Single-file implementation (`src/main.rs`).
+- Code organized into focused modules under `src/`.
 
 ---
 
@@ -43,7 +43,14 @@ rasplab/
 ├── rasplab.toml
 ├── README.md
 └── src/
-    └── main.rs
+  ├── main.rs
+  ├── config/mod.rs
+  ├── daemon/mod.rs
+  ├── paths/mod.rs
+  ├── process/mod.rs
+  ├── runtime/mod.rs
+  ├── telegram/mod.rs
+  └── telemetry/mod.rs
 ```
 
 The config, PID, and log files are stored in the same directory as the running binary, so the binary can be installed in any location without editing source paths.
@@ -140,7 +147,7 @@ Returns the project name and version, plus an "online" status line, e.g.:
 Status: online on Raspberry Pi 3
 ```
 
-Only this command is implemented so far. Adding new commands means extending the `if text.starts_with("/rasplab")` branch in `command_loop` inside `src/main.rs`.
+Only this command is implemented so far. Adding new commands means extending the `if text.starts_with("/rasplab")` branch in `command_loop` inside `src/telegram/mod.rs`.
 
 ### Periodic telemetry
 
