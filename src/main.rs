@@ -1,9 +1,8 @@
-mod config;
+mod api;
 mod daemon;
 mod paths;
 mod process;
 mod runtime;
-mod telegram;
 mod telemetry;
 
 use std::thread;
@@ -35,7 +34,10 @@ fn main() {
                 "{} v{} — foreground mode (Ctrl+C to stop)",
                 PROJ_NAME, PROJ_VERSION
             );
-            runtime::run_app(&paths);
+            if let Err(error) = runtime::run_app(&paths) {
+                eprintln!("API server failed: {}", error);
+                std::process::exit(1);
+            }
         }
     }
 }

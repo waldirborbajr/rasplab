@@ -1,14 +1,13 @@
 #!/bin/sh
 # Start, stop, restart and inspect the rasplab daemon.
 # Default directory is /home/borba/rasplab; override with RASPLAB_DIR.
-# Override other paths with RASPLAB_BIN, RASPLAB_CONFIG, RASPLAB_LOG, RASPLAB_PIDFILE.
+# Override other paths with RASPLAB_BIN, RASPLAB_LOG, RASPLAB_PIDFILE.
 
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 DIR="${RASPLAB_DIR:-/home/borba/rasplab}"
 BIN="${RASPLAB_BIN:-$DIR/rasplab}"
-CONFIG="${RASPLAB_CONFIG:-$DIR/rasplab.toml}"
 LOG="${RASPLAB_LOG:-$DIR/rasplab.log}"
 PIDFILE="${RASPLAB_PIDFILE:-$DIR/rasplab.pid}"
 
@@ -27,8 +26,6 @@ start() {
         return 0
     fi
     [ -x "$BIN" ] || { echo "error: $BIN not found or not executable" >&2; exit 1; }
-    [ -f "$CONFIG" ] || { echo "error: config $CONFIG not found" >&2; exit 1; }
-
     mkdir -p "$(dirname "$LOG")" "$(dirname "$PIDFILE")"
     rm -f "$PIDFILE"
 

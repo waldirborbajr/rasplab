@@ -1,4 +1,4 @@
-use fork::{daemon, Fork};
+use fork::{Fork, daemon};
 use nix::unistd::dup2;
 use std::fs;
 use std::os::unix::io::AsRawFd;
@@ -49,13 +49,17 @@ pub(super) fn daemonize(paths: &AppPaths) {
                 crate::PROJ_VERSION,
                 process::id()
             );
-            run_app(paths);
+            let result = run_app(paths);
+            remove_pid(paths);
+            if let Err(error) = result {
+                eprintln!("API server failed: {}", error);
+                process::exit(1);
+            }
             println!(
                 "--- {} v{} stopped ---",
                 crate::PROJ_NAME,
                 crate::PROJ_VERSION
             );
-            remove_pid(paths);
         }
         Ok(Fork::Parent(_)) => process::exit(0),
         Err(error) => {

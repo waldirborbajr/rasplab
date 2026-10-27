@@ -1,41 +1,43 @@
+use serde::Serialize;
 use std::fs;
 use sysinfo::{Components, System};
 
-pub(super) fn build_telemetry() -> String {
+#[derive(Serialize)]
+pub(super) struct Telemetry {
+    pub(super) name: &'static str,
+    pub(super) version: &'static str,
+    pub(super) cpu_temperature_celsius: Option<f32>,
+    pub(super) memory_used_mb: u64,
+    pub(super) memory_total_mb: u64,
+    pub(super) uptime_seconds: u64,
+    pub(super) ip: String,
+    pub(super) hostname: String,
+}
+
+pub(super) fn build_telemetry(ip: String, hostname: String) -> Telemetry {
     let mut sys = System::new();
     sys.refresh_memory();
 
     let components = Components::new_with_refreshed_list();
-    let temp = components
+    let temperature = components
         .iter()
         .filter(|c| is_cpu_temperature_label(c.label()))
         .find_map(|c| c.temperature())
-        .or_else(read_linux_cpu_temperature)
-        .map(|t| format!("{:.1} °C", t))
-        .unwrap_or_else(|| "N/A".to_string());
+        .or_else(read_linux_cpu_temperature);
 
-    let total_mem = sys.total_memory() / 1024 / 1024;
-    let used_mem = sys.used_memory() / 1024 / 1024;
+    let memory_total_mb = sys.total_memory() / 1024 / 1024;
+    let memory_used_mb = sys.used_memory() / 1024 / 1024;
 
-    let up = System::uptime();
-    let days = up / 86400;
-    let hours = (up % 86400) / 3600;
-    let minutes = (up % 3600) / 60;
-
-    format!(
-        "📊 *{name} v{ver} — telemetry*\n\
-         🌡️ CPU temp: {temp}\n\
-         🧠 RAM: {used} MB / {total} MB\n\
-         ⏱️ Uptime: {d}d {h}h {m}m",
-        name = crate::PROJ_NAME,
-        ver = crate::PROJ_VERSION,
-        temp = temp,
-        used = used_mem,
-        total = total_mem,
-        d = days,
-        h = hours,
-        m = minutes,
-    )
+    Telemetry {
+        name: crate::PROJ_NAME,
+        version: crate::PROJ_VERSION,
+        cpu_temperature_celsius: temperature,
+        memory_used_mb,
+        memory_total_mb,
+        uptime_seconds: System::uptime(),
+        ip,
+        hostname,
+    }
 }
 
 fn is_cpu_temperature_label(label: &str) -> bool {

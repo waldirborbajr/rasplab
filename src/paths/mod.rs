@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 pub(super) struct AppPaths {
     pub(super) base_dir: PathBuf,
-    pub(super) config_file: PathBuf,
+    pub(super) certificate_file: PathBuf,
+    pub(super) private_key_file: PathBuf,
     pub(super) pid_file: PathBuf,
     pub(super) log_file: PathBuf,
 }
@@ -15,7 +16,8 @@ impl AppPaths {
             .expect("executable has no parent directory")
             .to_path_buf();
         Self {
-            config_file: base_dir.join("rasplab.toml"),
+            certificate_file: base_dir.join("rasplab-cert.pem"),
+            private_key_file: base_dir.join("rasplab-key.pem"),
             pid_file: base_dir.join("rasplab.pid"),
             log_file: base_dir.join("rasplab.log"),
             base_dir,

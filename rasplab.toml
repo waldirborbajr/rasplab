@@ -1,4 +1,0 @@
-[telegram]
-bot_token = "YOUR_TOKEN_HERE"
-chat_id = "YOUR_CHAT_ID_HERE"
-interval_minutes = 30
