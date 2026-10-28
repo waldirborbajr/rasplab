@@ -15,7 +15,7 @@ use rcgen::{CertificateParams, KeyPair, SanType};
 use crate::paths::AppPaths;
 use crate::telemetry::{Telemetry, build_telemetry};
 
-const BIND_ADDRESS: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 8443);
+const BIND_ADDRESS: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 9443);
 
 #[derive(Clone)]
 struct HostInfo {

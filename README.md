@@ -6,10 +6,10 @@ JSON through an HTTPS API. It supports the service commands `start`, `stop`,
 
 ## API
 
-The service listens on `0.0.0.0:8443` and serves telemetry at:
+The service listens on `0.0.0.0:9443` and serves telemetry at:
 
 ```text
-GET https://<machine-ip-or-hostname>:8443/rasplab
+GET https://<machine-ip-or-hostname>:9443/rasplab
 ```
 
 The JSON response contains the project name and version, CPU temperature in
