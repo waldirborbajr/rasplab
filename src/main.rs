@@ -16,28 +16,35 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let cmd = args.get(1).map(|s| s.as_str()).unwrap_or("");
 
-    if cmd == "daemon" || cmd == "restart" {
-        let _ = std::fs::create_dir_all(&paths.base_dir);
+    if args.len() != 2 || !["start", "stop", "restart", "log"].contains(&cmd) {
+        eprintln!("usage: rasplab {{start|stop|restart|log}}");
+        std::process::exit(2);
     }
 
     match cmd {
-        "daemon" => daemon::daemonize(&paths),
+        "start" => {
+            let _ = std::fs::create_dir_all(&paths.base_dir);
+            daemon::daemonize(&paths);
+        }
         "stop" => process::stop_process(&paths),
-        "status" => process::status_process(&paths),
         "restart" => {
+            let _ = std::fs::create_dir_all(&paths.base_dir);
             process::stop_process(&paths);
             thread::sleep(Duration::from_millis(500));
             daemon::daemonize(&paths);
         }
-        _ => {
-            println!(
-                "{} v{} — foreground mode (Ctrl+C to stop)",
-                PROJ_NAME, PROJ_VERSION
-            );
-            if let Err(error) = runtime::run_app(&paths) {
-                eprintln!("API server failed: {}", error);
+        "log" => match std::process::Command::new("tail")
+            .args(["-n", "50", "-f"])
+            .arg(&paths.log_file)
+            .status()
+        {
+            Ok(status) if status.success() => {}
+            Ok(status) => std::process::exit(status.code().unwrap_or(1)),
+            Err(error) => {
+                eprintln!("failed to follow log: {}", error);
                 std::process::exit(1);
             }
-        }
+        },
+        _ => unreachable!(),
     }
 }

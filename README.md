@@ -1,8 +1,8 @@
 # Rasplab
 
-Rasplab is a Linux daemon for Raspberry Pi 3 that exposes system telemetry as
-JSON through an HTTPS API. It supports foreground execution and Unix daemon
-commands (`daemon`, `stop`, `status`, and `restart`).
+Rasplab is a Linux service for Raspberry Pi 3 that exposes system telemetry as
+JSON through an HTTPS API. It supports the service commands `start`, `stop`,
+`restart`, and `log`.
 
 ## API
 
@@ -40,8 +40,8 @@ rasplab/
 ├── rasplab
 ├── rasplab-cert.pem  # created automatically
 ├── rasplab-key.pem   # created automatically; private
-├── rasplab.log       # created when running as a daemon
-└── rasplab.pid       # created when running as a daemon
+├── rasplab.log       # created when the service starts
+└── rasplab.pid       # created when the service starts
 ```
 
 ## Building
@@ -61,14 +61,13 @@ The output is `target/aarch64-unknown-linux-musl/release/rasplab`.
 
 | Command | Description |
 |---------|-------------|
-| *(no argument)* | Run in the foreground; use `Ctrl+C` to stop. |
-| `daemon` | Detach and run in the background. |
-| `status` | Print whether the daemon is running. |
-| `stop` | Gracefully stop the daemon, then force-stop it after five seconds if needed. |
-| `restart` | Stop and start the daemon. |
+| `start` | Start the API service in the background. |
+| `stop` | Gracefully stop the service, then force-stop it after five seconds if needed. |
+| `restart` | Stop and start the service. |
+| `log` | Follow the last 50 service log lines. |
 
-Daemon logs and PID files are stored beside the executable. The API server
-shuts down gracefully on `SIGINT` or `SIGTERM`.
+Logs and PID files are stored beside the executable. The API server shuts down
+gracefully on `SIGINT` or `SIGTERM`.
 
 ## Dependencies
 
@@ -78,5 +77,5 @@ shuts down gracefully on `SIGINT` or `SIGTERM`.
 | `axum`, `axum-server`, `tokio` | HTTPS API server and asynchronous runtime. |
 | `rcgen` | Automatic self-signed certificate generation. |
 | `serde` | JSON response serialization. |
-| `fork` | Daemonization. |
+| `fork` | Background service startup. |
 | `nix` | Process signals and log redirection. |

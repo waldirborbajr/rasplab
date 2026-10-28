@@ -50,9 +50,3 @@ pub(super) fn stop_process(paths: &AppPaths) {
     }
 }
 
-pub(super) fn status_process(paths: &AppPaths) {
-    match read_pid(paths) {
-        Some(pid) if is_running(pid) => println!("running (pid {})", pid),
-        _ => println!("not running"),
-    }
-}
