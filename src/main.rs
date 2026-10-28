@@ -16,8 +16,8 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let cmd = args.get(1).map(|s| s.as_str()).unwrap_or("");
 
-    if args.len() != 2 || !["start", "stop", "restart", "log"].contains(&cmd) {
-        eprintln!("usage: rasplab {{start|stop|restart|log}}");
+    if args.len() != 2 || !["start", "stop", "restart", "status", "log"].contains(&cmd) {
+        eprintln!("usage: rasplab {{start|stop|restart|status|log}}");
         std::process::exit(2);
     }
 
@@ -27,6 +27,7 @@ fn main() {
             daemon::daemonize(&paths);
         }
         "stop" => process::stop_process(&paths),
+        "status" => process::status_process(&paths),
         "restart" => {
             let _ = std::fs::create_dir_all(&paths.base_dir);
             process::stop_process(&paths);

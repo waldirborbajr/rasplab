@@ -9,13 +9,13 @@ DIR="${RASPLAB_DIR:-/home/borba/rasplab}"
 BIN="${RASPLAB_BIN:-$DIR/rasplab}"
 
 case "${1:-}" in
-    start|stop|restart|log)
-        [ "$#" -eq 1 ] || { echo "usage: $0 {start|stop|restart|log}" >&2; exit 2; }
+    start|stop|restart|status|log)
+        [ "$#" -eq 1 ] || { echo "usage: $0 {start|stop|restart|status|log}" >&2; exit 2; }
         [ -x "$BIN" ] || { echo "error: $BIN not found or not executable" >&2; exit 1; }
         exec "$BIN" "$1"
         ;;
     *)
-        echo "usage: $0 {start|stop|restart|log}" >&2
+        echo "usage: $0 {start|stop|restart|status|log}" >&2
         exit 2
         ;;
 esac

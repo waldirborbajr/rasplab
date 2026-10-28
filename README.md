@@ -2,7 +2,7 @@
 
 Rasplab is a Linux service for Raspberry Pi 3 that exposes system telemetry as
 JSON through an HTTPS API. It supports the service commands `start`, `stop`,
-`restart`, and `log`.
+`restart`, `status`, and `log`.
 
 ## API
 
@@ -64,6 +64,7 @@ The output is `target/aarch64-unknown-linux-musl/release/rasplab`.
 | `start` | Start the API service in the background. |
 | `stop` | Gracefully stop the service, then force-stop it after five seconds if needed. |
 | `restart` | Stop and start the service. |
+| `status` | Show whether the service is active, its PID, and the PID and log file paths. |
 | `log` | Follow the last 50 service log lines. |
 
 Logs and PID files are stored beside the executable. The API server shuts down

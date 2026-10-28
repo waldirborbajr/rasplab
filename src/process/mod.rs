@@ -50,3 +50,22 @@ pub(super) fn stop_process(paths: &AppPaths) {
     }
 }
 
+pub(super) fn status_process(paths: &AppPaths) {
+    match read_pid(paths) {
+        Some(pid) if is_running(pid) => {
+            println!("rasplab: active (running)");
+            println!("  PID: {}", pid);
+        }
+        Some(pid) => {
+            println!("rasplab: inactive (stale PID file)");
+            println!("  PID: {} (not running)", pid);
+        }
+        None => {
+            println!("rasplab: inactive (not running)");
+            println!("  PID: unavailable");
+        }
+    }
+    println!("  PID file: {}", paths.pid_file.display());
+    println!("  Log file: {}", paths.log_file.display());
+}
+
