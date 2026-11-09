@@ -16,13 +16,21 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let cmd = args.get(1).map(|s| s.as_str()).unwrap_or("");
 
-    if args.len() != 2 || !["start", "stop", "restart", "status", "log"].contains(&cmd) {
-        eprintln!("usage: rasplab {{start|stop|restart|status|log}}");
+    if args.len() != 2
+        || !["start", "daemon", "stop", "restart", "status", "log"].contains(&cmd)
+    {
+        eprintln!("usage: rasplab {{start|daemon|stop|restart|status|log}}");
+        eprintln!("  start   run in foreground (container / local testing)");
+        eprintln!("  daemon  fork into background (bare metal / systemd only)");
         std::process::exit(2);
     }
 
     match cmd {
         "start" => {
+            let _ = std::fs::create_dir_all(&paths.base_dir);
+            daemon::run_foreground(&paths);
+        }
+        "daemon" => {
             let _ = std::fs::create_dir_all(&paths.base_dir);
             daemon::daemonize(&paths);
         }

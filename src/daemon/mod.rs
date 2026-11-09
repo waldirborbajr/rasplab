@@ -8,7 +8,33 @@ use crate::paths::AppPaths;
 use crate::process::{is_running, read_pid, remove_pid, write_pid};
 use crate::runtime::run_app;
 
+fn is_container() -> bool {
+    std::path::Path::new("/.dockerenv").exists()
+}
+
+/// Runs the server in the foreground (stdout/stderr). Intended for containers and local testing.
+pub(super) fn run_foreground(paths: &AppPaths) {
+    println!(
+        "--- {} v{} starting (foreground) ---",
+        crate::PROJ_NAME,
+        crate::PROJ_VERSION,
+    );
+    let result = run_app(paths);
+    if let Err(error) = result {
+        eprintln!("API server failed: {}", error);
+        process::exit(1);
+    }
+    println!("--- {} v{} stopped ---", crate::PROJ_NAME, crate::PROJ_VERSION);
+}
+
+/// Forks the process into a background daemon. Not supported inside containers.
 pub(super) fn daemonize(paths: &AppPaths) {
+    if is_container() {
+        eprintln!(
+            "error: 'daemon' mode is not supported inside a container. Use 'start' instead."
+        );
+        process::exit(1);
+    }
     if let Some(pid) = read_pid(paths) {
         if is_running(pid) {
             eprintln!("already running (pid {})", pid);

@@ -1,0 +1,12 @@
+services:
+  rasplab:
+    image: rasplab:latest       # carregada via docker load — sem DockerHub
+    restart: unless-stopped
+    ports:
+      - "9443:9443"
+    volumes:
+      - rasplab-data:/app       # persiste cert, pid e log entre restarts
+    command: ["/app/rasplab", "start"]
+
+volumes:
+  rasplab-data:

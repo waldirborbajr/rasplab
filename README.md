@@ -1,8 +1,8 @@
 # Rasplab
 
 Rasplab is a Linux service for Raspberry Pi 3 that exposes system telemetry as
-JSON through an HTTPS API. It supports the service commands `start`, `stop`,
-`restart`, `status`, and `log`.
+JSON through an HTTPS API. It supports the service commands `start`, `daemon`,
+`stop`, `restart`, `status`, and `log`.
 
 ## API
 
@@ -40,8 +40,8 @@ rasplab/
 ├── rasplab
 ├── rasplab-cert.pem  # created automatically
 ├── rasplab-key.pem   # created automatically; private
-├── rasplab.log       # created when the service starts
-└── rasplab.pid       # created when the service starts
+├── rasplab.log       # created when the service starts (daemon mode only)
+└── rasplab.pid       # created when the service starts (daemon mode only)
 ```
 
 ## Building
@@ -59,16 +59,55 @@ The output is `target/aarch64-unknown-linux-musl/release/rasplab`.
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `start` | Start the API service in the background. |
-| `stop` | Gracefully stop the service, then force-stop it after five seconds if needed. |
-| `restart` | Stop and start the service. |
+| Command  | Description |
+|----------|-------------|
+| `start`  | Start the API service **in the foreground** (stdout/stderr). Use inside containers or for local testing. |
+| `daemon` | Fork the service into the **background**. For bare-metal or systemd deployments only — not supported inside containers. |
+| `stop`   | Gracefully stop the service, then force-stop it after five seconds if needed. |
+| `restart`| Stop and start the service (background). |
 | `status` | Show whether the service is active, its PID, and the PID and log file paths. |
-| `log` | Follow the last 50 service log lines. |
+| `log`    | Follow the last 50 service log lines. |
+
+> **Note:** `daemon` detects if it is running inside a Docker container
+> (via `/.dockerenv`) and exits with an error. Use `start` inside containers.
 
 Logs and PID files are stored beside the executable. The API server shuts down
 gracefully on `SIGINT` or `SIGTERM`.
+
+## Docker deployment (no DockerHub)
+
+Build the image on your machine targeting `arm64`, transfer it to the Pi, and
+run it with Compose — no registry required.
+
+### 1. Build and transfer
+
+```bash
+# build on your machine (requires docker buildx)
+docker buildx build --platform linux/arm64 -t rasplab:latest --load .
+
+# transfer to the Pi
+docker save rasplab:latest | ssh pi@<raspi-ip> 'docker load'
+```
+
+### 2. Run on the Pi
+
+```bash
+# copy docker-compose.yml to the Pi once
+scp docker-compose.yml pi@<raspi-ip>:~/rasplab/
+
+# on the Pi
+cd ~/rasplab
+docker compose up -d
+```
+
+### 3. Re-deploy after changes
+
+```bash
+# on your machine
+docker buildx build --platform linux/arm64 -t rasplab:latest --load .
+docker save rasplab:latest | ssh pi@<raspi-ip> 'docker load'
+ssh pi@<raspi-ip> 'cd ~/rasplab && docker compose up -d --force-recreate'
+```
 
 ## Dependencies
 
@@ -78,5 +117,5 @@ gracefully on `SIGINT` or `SIGTERM`.
 | `axum`, `axum-server`, `tokio` | HTTPS API server and asynchronous runtime. |
 | `rcgen` | Automatic self-signed certificate generation. |
 | `serde` | JSON response serialization. |
-| `fork` | Background service startup. |
+| `fork` | Background service startup (`daemon` mode). |
 | `nix` | Process signals and log redirection. |
