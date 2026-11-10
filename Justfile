@@ -1,4 +1,4 @@
-raspi := "pi@raspi"
+raspi := "borba@rasplab"
 raspi_dir := "~/rasplab"
 
 # lista os recipes disponíveis
