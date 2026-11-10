@@ -13,7 +13,10 @@ COPY . .
 RUN cargo build --release --target aarch64-unknown-linux-musl
 
 # Stage 2 — imagem final mínima (sem Rust, sem toolchain)
-FROM debian:bookworm-slim
+# FROM debian:bookworm-slim
+
+# Stage 2 — scratch: zero OS, static binary only
+FROM scratch
 
 WORKDIR /app
 COPY --from=builder /app/target/aarch64-unknown-linux-musl/release/rasplab .
@@ -21,3 +24,7 @@ COPY --from=builder /app/target/aarch64-unknown-linux-musl/release/rasplab .
 EXPOSE 9443
 
 CMD ["/app/rasplab", "start"]
+
+
+# Stage 2 — scratch: zero OS, static binary only
+FROM scratch
